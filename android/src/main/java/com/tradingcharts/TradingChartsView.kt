@@ -206,11 +206,13 @@ class TradingChartsView(context: Context) : FrameLayout(context) {
                   } else if (!scaleDetector.isInProgress) {
                     if (isPointInYAxis(first)) {
                       if (config.allowYAxisScale) {
+                        // Use initial coordinate as Y-scaling origin.
+                        val initialYAxisTouchY = first?.y ?: return true
                         shouldScheduleFrame =
                             ChartEngineNative.nativeScaleYAt(
                                 engineHandle,
                                 -distanceY,
-                                current.y,
+                                initialYAxisTouchY,
                                 scaleYResult.numbers,
                                 scaleYResult.strings,
                             )
