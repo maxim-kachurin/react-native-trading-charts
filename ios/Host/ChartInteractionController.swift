@@ -13,6 +13,7 @@ final class ChartInteractionController: NSObject, UIGestureRecognizerDelegate {
   private var config = NativeChartConfig()
   private var panesResizable = false
   private var scalingYAxis = false
+  private var initialYAxisTouchY: Float?
   private var suppressMomentum = false
   private var crosshairPinned = false
   private var crosshairGestureActive = false
@@ -54,6 +55,7 @@ final class ChartInteractionController: NSObject, UIGestureRecognizerDelegate {
   func cancelInteraction() {
     momentum.stop()
     scalingYAxis = false
+    initialYAxisTouchY = nil
     suppressMomentum = false
     resizingSeparator = nil
   }
@@ -83,6 +85,7 @@ final class ChartInteractionController: NSObject, UIGestureRecognizerDelegate {
     switch recognizer.state {
     case .began:
       momentum.stop()
+      initialYAxisTouchY = nil
       let point = recognizer.location(in: view)
       if panesResizable, let separator = engine.separator(at: Float(point.y), hitSlop: 12) {
         resizingSeparator = separator
@@ -100,6 +103,8 @@ final class ChartInteractionController: NSObject, UIGestureRecognizerDelegate {
       suppressMomentum = scalingYAxis
       recognizer.setTranslation(.zero, in: view)
       if scalingYAxis, config.allow_y_axis_scale {
+        // Keep initial coordinate to use as Y-scaling origin.
+        initialYAxisTouchY = Float(point.y)
         _ = engine.scaleY(0)
         requestFrame()
       }
@@ -122,9 +127,8 @@ final class ChartInteractionController: NSObject, UIGestureRecognizerDelegate {
       let translation = recognizer.translation(in: view)
       recognizer.setTranslation(.zero, in: view)
       if scalingYAxis {
-        let point = recognizer.location(in: view)
-        if config.allow_y_axis_scale {
-          let result = engine.scaleY(Float(translation.y), at: Float(point.y))
+        if config.allow_y_axis_scale, let initialYAxisTouchY {
+          let result = engine.scaleY(Float(translation.y), at: initialYAxisTouchY)
           events.priceScaleChanges.record(result)
           if result.stateChanged { requestFrame() }
         }
@@ -132,6 +136,7 @@ final class ChartInteractionController: NSObject, UIGestureRecognizerDelegate {
         requestFrame()
       }
     case .ended, .cancelled, .failed:
+      initialYAxisTouchY = nil
       if let separator = resizingSeparator {
         resizingSeparator = nil
         events.pendingPaneResize = (separator, true)
